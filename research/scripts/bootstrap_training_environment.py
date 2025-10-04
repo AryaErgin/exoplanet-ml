@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Iterable
+from typing import Dict, Iterable
 
 import sys
 import numpy as np
@@ -22,6 +22,7 @@ if str(ROOT) not in sys.path:
 
 from research.train_from_nasa import (  # type: ignore  # pylint: disable=wrong-import-position
     FEATURE_COLUMNS,
+    _ensure_schema,
     fetch_koi,
     fetch_nonplanets,
     fetch_stellar_params,
@@ -54,25 +55,76 @@ def _assemble_features(rows: Iterable[dict], csv_path: Path) -> None:
     df.to_csv(csv_path, index=False)
 
 
+def _load_existing_rows(csv_path: Path) -> Dict[int, dict]:
+    if not csv_path.exists():
+        return {}
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return {}
+
+    if df.empty or "kepid" not in df.columns:
+        return {}
+
+    df = _ensure_schema(df)
+    rows = {}
+    for entry in df.to_dict(orient="records"):
+        try:
+            kepid = int(entry.get("kepid"))
+        except Exception:
+            continue
+        entry["kepid"] = kepid
+        rows[kepid] = entry
+    return rows
+
+
 def bootstrap(out_dir: Path, count: int) -> Path:
     pos_ids = fetch_koi(count)
     neg_ids = fetch_nonplanets(count)
     stellar = fetch_stellar_params(pos_ids + neg_ids)
 
     curve_dir = out_dir / "lightcurves"
+    csv_path = out_dir / "features.csv"
+    cached_rows = _load_existing_rows(csv_path)
+
+    reused_pos = reused_neg = 0
+    new_pos = new_neg = 0
+
     rows = []
     for kepid in pos_ids + neg_ids:
         label = 1 if kepid in pos_ids else 0
+        curve_path = curve_dir / ("positives" if label else "negatives") / f"kic_{kepid}.csv"
+
+        if kepid in cached_rows and curve_path.exists():
+            row = dict(cached_rows[kepid])
+            row["label"] = label
+            rows.append(row)
+            if label:
+                reused_pos += 1
+            else:
+                reused_neg += 1
+            continue
+
         ts = download_kepler_lc(kepid)
         if ts is None:
             continue
         time, flux = ts
         _save_curve(curve_dir / ("positives" if label else "negatives"), kepid, time, flux)
         feats = simple_features(time, flux, stellar.get(int(kepid)))
-        rows.append({**feats, "kepid": int(kepid), "label": label})
+        row = {**feats, "kepid": int(kepid), "label": label}
+        rows.append(row)
+        if label:
+            new_pos += 1
+        else:
+            new_neg += 1
 
-    csv_path = out_dir / "features.csv"
     _assemble_features(rows, csv_path)
+
+    print(
+        "[BOOTSTRAP] reused pos=%d neg=%d | downloaded pos=%d neg=%d"
+        % (reused_pos, reused_neg, new_pos, new_neg)
+    )
     return csv_path
 
 

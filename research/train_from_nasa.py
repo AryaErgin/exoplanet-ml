@@ -153,11 +153,11 @@ def download_kepler_lc(kepid: int):
         sr = lk.search_lightcurve(f"KIC {kepid}", mission="Kepler", cadence="long")
         if len(sr) == 0:
             return None
-        sr = sr[:2]
-        lcs = [lc for lc in (entry.download() for entry in sr) if lc is not None]
-        if not lcs:
+        entry = sr[0]
+        lc = entry.download()
+        if lc is None:
             return None
-        lc = lcs[0].normalize().remove_nans()
+        lc = lc.normalize().remove_nans()
         time = lc.time.value
         flux = lc.flux.value
 
@@ -255,11 +255,17 @@ def _compute_bls(t: np.ndarray, f: np.ndarray) -> Tuple[Dict[str, float], List[T
 
     flux = f / np.nanmedian(f)
     flux = flux - np.nanmedian(flux)
-    baseline = np.linspace(0.5, 40.0, 2000)
-    durations = np.linspace(0.05, 0.3, 20)
+    # Light-weight grid to keep bootstrap throughput high while still sampling
+    # plausible transit durations in the 1.2–7.2 hour range.
+    durations = np.linspace(0.05, 0.3, 8)
     try:
         bls = BoxLeastSquares(t, flux)
-        res = bls.power(baseline, durations)
+        res = bls.autopower(
+            durations,
+            minimum_period=0.5,
+            maximum_period=40.0,
+            frequency_factor=3.0,
+        )
     except Exception:
         return (
             {
@@ -392,6 +398,28 @@ def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int
     if removed > 0:
         df.loc[keep_mask].to_csv(csv_path, index=False)
     return removed
+
+def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int:
+    """Ensure cached negatives align with the currently fetched set."""
+    if not csv_path.exists():
+        return 0
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return 0
+
+    if df.empty or "kepid" not in df or "label" not in df:
+        return 0
+
+    neg_mask = df["label"] == 0
+    keep_mask = ~neg_mask | df["kepid"].isin(list(allowed_negatives))
+    removed = int((~keep_mask).sum())
+    if removed > 0:
+        cleaned = _ensure_schema(df.loc[keep_mask])
+        cleaned.to_csv(csv_path, index=False)
+    return removed
+
 
 def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int:
     """Ensure cached negatives align with the currently fetched set."""
