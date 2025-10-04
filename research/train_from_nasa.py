@@ -61,7 +61,7 @@ def fetch_nonplanets(n: int) -> List[int]:
     tbl = NasaExoplanetArchive.query_criteria(
         table="q1_q17_dr25_sup_koi",
         select="kepid,koi_disposition",
-        where="koi_disposition!='CONFIRMED'",
+        where="koi_disposition='FALSE POSITIVE'",
     )
     df = tbl.to_pandas().dropna(subset=["kepid"]).drop_duplicates("kepid")
     if df.empty:
@@ -140,6 +140,25 @@ def load_processed_kepids(csv_path: Path) -> set[int]:
     except Exception:
         return set()
 
+def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int:
+    """Ensure cached negatives align with the currently fetched set."""
+    if not csv_path.exists():
+        return 0
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return 0
+
+    if df.empty or "kepid" not in df or "label" not in df:
+        return 0
+
+    neg_mask = df["label"] == 0
+    keep_mask = ~neg_mask | df["kepid"].isin(list(allowed_negatives))
+    removed = int((~keep_mask).sum())
+    if removed > 0:
+        df.loc[keep_mask].to_csv(csv_path, index=False)
+    return removed
 
 def append_row(csv_path: Path, row: Dict) -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
@@ -201,6 +220,10 @@ if __name__ == "__main__":
     neg_ids = fetch_nonplanets(NEG_N)
     total_target = len(pos_ids) + len(neg_ids)
     print(f"[FETCH] Planned {total_target} targets (pos={len(pos_ids)} neg={len(neg_ids)})")
+
+    removed_neg = refresh_cached_negatives(FEATURES_CSV, set(neg_ids))
+    if removed_neg:
+        print(f"[RESUME] Removed {removed_neg} cached negatives not in FALSE POSITIVE set")
 
     processed = load_processed_kepids(FEATURES_CSV)
     print(f"[RESUME] Already have {len(processed)} rows in {FEATURES_CSV.name}")
