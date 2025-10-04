@@ -22,3 +22,10 @@ export async function getHealth(signal) {
   if (!r.ok) throw new Error(`API ${r.status}`);
   return r.json();
 }
+
+export async function getEvaluationReport(signal) {
+  const r = await fetch(`${BASE}/evaluation/report`, { signal });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`API ${r.status}`);
+  return r.json();
+}

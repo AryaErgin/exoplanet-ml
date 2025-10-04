@@ -27,6 +27,7 @@ export default function PredictionCard({ data, onAddToCatalog, onResult }) {
         { time: data.time, flux: data.flux, meta: data.meta || {} },
         ctrlRef.current.signal
       );
+      const fallbackStarId = data?.meta?.star_id || data?.meta?.kepid;
       res = {
         probability: Number(body.probability) || 0,
         dipsAt: Array.isArray(body.dipsAt) ? body.dipsAt : [],
@@ -39,7 +40,11 @@ export default function PredictionCard({ data, onAddToCatalog, onResult }) {
         vetting: body.vetting || {},
         periodogram: Array.isArray(body.periodogram) ? body.periodogram : [],
         id: body.id,
-        starId: `KIC-${Math.floor(Math.random() * 9_000_000)}`,
+        starId:
+          body.starId ||
+          fallbackStarId ||
+          (data?.meta?.starId ? String(data.meta.starId) : null) ||
+          `KIC-${Math.floor(Math.random() * 9_000_000)}`,
         filename: data?.meta?.filename || "uploaded.csv",
         rows: data?.meta?.rows || data.time.length,
         createdAt: new Date().toISOString(),
@@ -51,6 +56,7 @@ export default function PredictionCard({ data, onAddToCatalog, onResult }) {
         .slice(0, 5)
         .map((i) => data.time[i])
         .filter(isFiniteNum);
+      const fallbackStarId = data?.meta?.star_id || data?.meta?.kepid;
       res = {
         probability: score,
         dipsAt,
@@ -63,7 +69,10 @@ export default function PredictionCard({ data, onAddToCatalog, onResult }) {
         vetting: {},
         periodogram: [],
         id: `EV-${Date.now()}`,
-        starId: `KIC-${Math.floor(Math.random() * 9_000_000)}`,
+        starId:
+          fallbackStarId ||
+          (data?.meta?.starId ? String(data.meta.starId) : null) ||
+          `KIC-${Math.floor(Math.random() * 9_000_000)}`,
         filename: data?.meta?.filename || "uploaded.csv",
         rows: data?.meta?.rows || data.time.length,
         createdAt: new Date().toISOString(),

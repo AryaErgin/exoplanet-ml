@@ -17,15 +17,18 @@ async def predict(body: PredictIn):
         raise HTTPException(status_code=400, detail="time_flux_length_mismatch")
     try:
         out = ml_predict(body.time, body.flux, body.meta or {})
-        if body.meta:
-            out["meta"] = body.meta
         meta = body.meta or {}
+        star_id = str(meta.get("star_id") or meta.get("kepid") or "").strip()
+        if meta:
+            out["meta"] = meta
+        if star_id:
+            out["starId"] = star_id
         session = SessionLocal()
         try:
             run = Run(
                 id=out.get("id"),
                 filename=str(meta.get("filename", "")),
-                star_id=str(meta.get("star_id") or meta.get("kepid") or ""),
+                star_id=star_id,
                 probability=float(out.get("probability", 0.0)),
                 dips_at=",".join(str(x) for x in out.get("dipsAt", [])),
                 rows=len(body.time),

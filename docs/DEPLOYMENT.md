@@ -55,6 +55,8 @@ The frontend connects to the backend over the internal Docker network via
 After a successful evaluation run, copy the updated model artifacts into
 `backend/app/models/current/` and commit the `research/work/eval/evaluation_report.json`
 file so judges can trace the reported metrics back to the generated evidence.
+The backend exposes these metrics at `GET /evaluation/report`, and the frontend
+panel automatically surfaces the latest figures once this file is present.
 
 ## 5. Troubleshooting
 
