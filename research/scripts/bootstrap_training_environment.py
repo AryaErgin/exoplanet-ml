@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Dict, Iterable
+from typing import Dict, Iterable, Optional, Tuple
 
 import sys
 import numpy as np
@@ -79,6 +79,26 @@ def _load_existing_rows(csv_path: Path) -> Dict[int, dict]:
     return rows
 
 
+def _load_curve_from_disk(path: Path) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    if not path.exists():
+        return None
+
+    try:
+        data = np.loadtxt(path, delimiter=",", skiprows=1)
+    except Exception:
+        return None
+
+    if data.size == 0:
+        return None
+
+    if data.ndim == 1:
+        data = data.reshape(-1, 2)
+
+    time = np.asarray(data[:, 0], dtype=float)
+    flux = np.asarray(data[:, 1], dtype=float)
+    return time, flux
+
+
 def bootstrap(out_dir: Path, count: int) -> Path:
     pos_ids = fetch_koi(count)
     neg_ids = fetch_nonplanets(count)
@@ -89,6 +109,7 @@ def bootstrap(out_dir: Path, count: int) -> Path:
     cached_rows = _load_existing_rows(csv_path)
 
     reused_pos = reused_neg = 0
+    recovered_pos = recovered_neg = 0
     new_pos = new_neg = 0
 
     rows = []
@@ -96,34 +117,52 @@ def bootstrap(out_dir: Path, count: int) -> Path:
         label = 1 if kepid in pos_ids else 0
         curve_path = curve_dir / ("positives" if label else "negatives") / f"kic_{kepid}.csv"
 
-        if kepid in cached_rows and curve_path.exists():
-            row = dict(cached_rows[kepid])
-            row["label"] = label
-            rows.append(row)
-            if label:
-                reused_pos += 1
-            else:
-                reused_neg += 1
-            continue
+        row: Optional[dict] = None
 
-        ts = download_kepler_lc(kepid)
-        if ts is None:
-            continue
-        time, flux = ts
-        _save_curve(curve_dir / ("positives" if label else "negatives"), kepid, time, flux)
-        feats = simple_features(time, flux, stellar.get(int(kepid)))
-        row = {**feats, "kepid": int(kepid), "label": label}
-        rows.append(row)
-        if label:
-            new_pos += 1
-        else:
-            new_neg += 1
+        if curve_path.exists():
+            if kepid in cached_rows:
+                row = dict(cached_rows[kepid])
+                if label:
+                    reused_pos += 1
+                else:
+                    reused_neg += 1
+            else:
+                cached_curve = _load_curve_from_disk(curve_path)
+                if cached_curve is not None:
+                    time, flux = cached_curve
+                    feats = simple_features(time, flux, stellar.get(int(kepid)))
+                    row = {**feats, "kepid": int(kepid)}
+                    cached_rows[kepid] = dict(row)
+                    if label:
+                        recovered_pos += 1
+                    else:
+                        recovered_neg += 1
+
+        if row is None:
+            ts = download_kepler_lc(kepid)
+            if ts is None:
+                continue
+            time, flux = ts
+            _save_curve(curve_dir / ("positives" if label else "negatives"), kepid, time, flux)
+            feats = simple_features(time, flux, stellar.get(int(kepid)))
+            row = {**feats, "kepid": int(kepid)}
+            cached_rows[kepid] = dict(row)
+            if label:
+                new_pos += 1
+            else:
+                new_neg += 1
+
+        row["label"] = label
+        rows.append(dict(row))
 
     _assemble_features(rows, csv_path)
 
     print(
-        "[BOOTSTRAP] reused pos=%d neg=%d | downloaded pos=%d neg=%d"
-        % (reused_pos, reused_neg, new_pos, new_neg)
+        (
+            "[BOOTSTRAP] reused rows pos=%d neg=%d | recovered-from-disk pos=%d neg=%d | "
+            "downloaded pos=%d neg=%d"
+        )
+        % (reused_pos, reused_neg, recovered_pos, recovered_neg, new_pos, new_neg)
     )
     return csv_path
 

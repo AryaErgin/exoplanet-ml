@@ -487,6 +487,28 @@ def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int
     return removed
 
 
+def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int:
+    """Ensure cached negatives align with the currently fetched set."""
+    if not csv_path.exists():
+        return 0
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return 0
+
+    if df.empty or "kepid" not in df or "label" not in df:
+        return 0
+
+    neg_mask = df["label"] == 0
+    keep_mask = ~neg_mask | df["kepid"].isin(list(allowed_negatives))
+    removed = int((~keep_mask).sum())
+    if removed > 0:
+        cleaned = _ensure_schema(df.loc[keep_mask])
+        cleaned.to_csv(csv_path, index=False)
+    return removed
+
+
 def append_row(csv_path: Path, row: Dict) -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     header = not csv_path.exists()
