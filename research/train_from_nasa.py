@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json, os, time
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -29,6 +29,8 @@ BASE = Path(__file__).resolve().parent                   # research/
 WORK_DIR = BASE / "work"
 OUT_DIR = BASE.parent / "backend" / "app" / "models" / "current"
 FEATURES_CSV = WORK_DIR / "features_incremental.csv"
+BOOTSTRAP_DIR = WORK_DIR / "bootstrap"
+BOOTSTRAP_FEATURES = BOOTSTRAP_DIR / "features.csv"
 
 FEATURE_COLUMNS = [
     "kepid",
@@ -169,6 +171,31 @@ def download_kepler_lc(kepid: int):
         return np.asarray(time, dtype=float), np.asarray(flux, dtype=float)
     except Exception:
         return None
+
+
+def _bootstrap_curve_path(kepid: int, label: int) -> Path:
+    subdir = "positives" if int(label) == 1 else "negatives"
+    return BOOTSTRAP_DIR / "lightcurves" / subdir / f"kic_{int(kepid)}.csv"
+
+
+def _load_bootstrap_curve(path: Path) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    if not path.exists():
+        return None
+
+    try:
+        data = np.loadtxt(path, delimiter=",", skiprows=1)
+    except Exception:
+        return None
+
+    if data.size == 0:
+        return None
+
+    if data.ndim == 1:
+        data = data.reshape(-1, 2)
+
+    time = np.asarray(data[:, 0], dtype=float)
+    flux = np.asarray(data[:, 1], dtype=float)
+    return time, flux
 
 # --------- Transform (must match backend) ---------
 def _ensure_schema(df: pd.DataFrame) -> pd.DataFrame:
@@ -509,12 +536,106 @@ def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int
     return removed
 
 
+def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int:
+    """Ensure cached negatives align with the currently fetched set."""
+    if not csv_path.exists():
+        return 0
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return 0
+
+    if df.empty or "kepid" not in df or "label" not in df:
+        return 0
+
+    neg_mask = df["label"] == 0
+    keep_mask = ~neg_mask | df["kepid"].isin(list(allowed_negatives))
+    removed = int((~keep_mask).sum())
+    if removed > 0:
+        cleaned = _ensure_schema(df.loc[keep_mask])
+        cleaned.to_csv(csv_path, index=False)
+    return removed
+
+
 def append_row(csv_path: Path, row: Dict) -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     header = not csv_path.exists()
     df = pd.DataFrame([row])
     df = _ensure_schema(df)
     df.to_csv(csv_path, mode="a", header=header, index=False)
+
+
+def preseed_from_bootstrap(csv_path: Path) -> Dict[str, int]:
+    stats = {"imported": 0, "recomputed": 0, "fallback": 0}
+
+    if not BOOTSTRAP_FEATURES.exists():
+        return stats
+
+    try:
+        bootstrap_df = pd.read_csv(BOOTSTRAP_FEATURES)
+    except Exception:
+        return stats
+
+    if bootstrap_df.empty or "kepid" not in bootstrap_df.columns:
+        return stats
+
+    bootstrap_df = _ensure_schema(bootstrap_df)
+    existing = load_processed_kepids(csv_path)
+
+    for record in bootstrap_df.to_dict(orient="records"):
+        try:
+            kepid = int(record.get("kepid"))
+        except Exception:
+            continue
+
+        if kepid in existing:
+            continue
+
+        label_val = record.get("label")
+        if pd.isna(label_val):
+            continue
+
+        try:
+            label = int(label_val)
+        except Exception:
+            continue
+
+        curve_path = _bootstrap_curve_path(kepid, label)
+        payload: Optional[dict] = None
+        cached_curve = _load_bootstrap_curve(curve_path)
+
+        if cached_curve is not None:
+            time_arr, flux_arr = cached_curve
+            stellar_info = {}
+            for key in ("stellar_teff", "stellar_logg", "stellar_radius"):
+                val = record.get(key)
+                if pd.notna(val):
+                    try:
+                        stellar_info[key] = float(val)
+                    except Exception:
+                        continue
+
+            feats = simple_features(time_arr, flux_arr, stellar_info or None)
+
+            if not stellar_info:
+                for key in ("stellar_teff", "stellar_logg", "stellar_radius"):
+                    feats.setdefault(key, record.get(key, np.nan))
+
+            payload = feats
+            stats["recomputed"] += 1
+
+        if payload is None:
+            fallback_df = _ensure_schema(pd.DataFrame([record]))
+            payload = fallback_df.iloc[0].to_dict()
+            stats["fallback"] += 1
+
+        payload.update({"kepid": kepid, "label": int(label)})
+        append_row(csv_path, payload)
+        existing.add(kepid)
+        stats["imported"] += 1
+
+    return stats
 
 
 # --------- TRAIN & SAVE ---------
@@ -603,6 +724,13 @@ if __name__ == "__main__":
     removed_neg = refresh_cached_negatives(FEATURES_CSV, set(neg_ids))
     if removed_neg:
         print(f"[RESUME] Removed {removed_neg} cached negatives not in FALSE POSITIVE set")
+
+    seeded = preseed_from_bootstrap(FEATURES_CSV)
+    if seeded.get("imported"):
+        print(
+            "[RESUME] Imported %d bootstrap rows (recomputed=%d fallback=%d)"
+            % (seeded["imported"], seeded["recomputed"], seeded["fallback"])
+        )
 
     processed = load_processed_kepids(FEATURES_CSV)
     print(f"[RESUME] Already have {len(processed)} rows in {FEATURES_CSV.name}")
