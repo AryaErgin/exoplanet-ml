@@ -32,7 +32,13 @@ from research.train_from_nasa import (  # type: ignore  # pylint: disable=wrong-
 
 def _save_curve(out_dir: Path, kepid: int, time: np.ndarray, flux: np.ndarray) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
-    data = np.column_stack([time, flux])
+
+    if np.ma.isMaskedArray(time):
+        time = time.filled(np.nan)
+    if np.ma.isMaskedArray(flux):
+        flux = flux.filled(np.nan)
+
+    data = np.column_stack([np.asarray(time, dtype=float), np.asarray(flux, dtype=float)])
     path = out_dir / f"kic_{kepid}.csv"
     np.savetxt(path, data, delimiter=",", header="time,flux", comments="")
     return path
