@@ -132,7 +132,7 @@ def fetch_stellar_params(kepids: List[int]) -> Dict[int, Dict[str, float]]:
         where = "kepid in (" + ",".join(str(int(k)) for k in chunk) + ")"
         tbl = NasaExoplanetArchive.query_criteria(
             table="q1_q17_dr25_sup_koi",
-            select="kepid,koi_steff,koi_slogg,koi_sradius",
+            select="kepid,koi_steff,koi_slogg,koi_srad",
             where=where,
         )
         if tbl is None:
@@ -142,7 +142,7 @@ def fetch_stellar_params(kepids: List[int]) -> Dict[int, Dict[str, float]]:
             params[int(row.kepid)] = {
                 "stellar_teff": float(getattr(row, "koi_steff", np.nan)),
                 "stellar_logg": float(getattr(row, "koi_slogg", np.nan)),
-                "stellar_radius": float(getattr(row, "koi_sradius", np.nan)),
+                "stellar_radius": float(getattr(row, "koi_srad", np.nan)),
             }
     return params
 
@@ -384,6 +384,28 @@ def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int
     if removed > 0:
         df.loc[keep_mask].to_csv(csv_path, index=False)
     return removed
+
+def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int:
+    """Ensure cached negatives align with the currently fetched set."""
+    if not csv_path.exists():
+        return 0
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return 0
+
+    if df.empty or "kepid" not in df or "label" not in df:
+        return 0
+
+    neg_mask = df["label"] == 0
+    keep_mask = ~neg_mask | df["kepid"].isin(list(allowed_negatives))
+    removed = int((~keep_mask).sum())
+    if removed > 0:
+        cleaned = _ensure_schema(df.loc[keep_mask])
+        cleaned.to_csv(csv_path, index=False)
+    return removed
+
 
 def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int:
     """Ensure cached negatives align with the currently fetched set."""

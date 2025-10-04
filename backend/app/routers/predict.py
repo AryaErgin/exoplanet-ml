@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from ..ml.model import predict as ml_predict
+from ..db import SessionLocal, Run
 
 router = APIRouter()
 
@@ -18,6 +19,24 @@ async def predict(body: PredictIn):
         out = ml_predict(body.time, body.flux, body.meta or {})
         if body.meta:
             out["meta"] = body.meta
+        meta = body.meta or {}
+        session = SessionLocal()
+        try:
+            run = Run(
+                id=out.get("id"),
+                filename=str(meta.get("filename", "")),
+                star_id=str(meta.get("star_id") or meta.get("kepid") or ""),
+                probability=float(out.get("probability", 0.0)),
+                dips_at=",".join(str(x) for x in out.get("dipsAt", [])),
+                rows=len(body.time),
+                meta=meta,
+            )
+            session.add(run)
+            session.commit()
+        except Exception:
+            session.rollback()
+        finally:
+            session.close()
         return out
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
