@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    image: exovision-backend:latest
+    environment:
+      - UVICORN_HOST=0.0.0.0
+      - UVICORN_PORT=8000
+    volumes:
+      - ../backend/app/models/current:/app/app/models/current
+      - ../research/work:/workspace/research/work
+    ports:
+      - "8000:8000"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    image: exovision-frontend:latest
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_URL=http://backend:8000
+    ports:
+      - "5173:5173"
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
+  trainer:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    image: exovision-trainer:latest
+    command: ["python", "research/train_from_nasa.py"]
+    volumes:
+      - ../research:/workspace/research
+      - ../backend/app/models/current:/workspace/backend/app/models/current
+    profiles: ["training"]
