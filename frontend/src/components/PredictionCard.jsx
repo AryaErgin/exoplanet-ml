@@ -37,6 +37,7 @@ export default function PredictionCard({ data, onAddToCatalog, onResult }) {
         snr: Number(body.snr) || null,
         topPeriods: Array.isArray(body.topPeriods) ? body.topPeriods : [],
         vetting: body.vetting || {},
+        periodogram: Array.isArray(body.periodogram) ? body.periodogram : [],
         id: body.id,
         starId: `KIC-${Math.floor(Math.random() * 9_000_000)}`,
         filename: data?.meta?.filename || "uploaded.csv",
@@ -60,6 +61,7 @@ export default function PredictionCard({ data, onAddToCatalog, onResult }) {
         snr: null,
         topPeriods: [],
         vetting: {},
+        periodogram: [],
         id: `EV-${Date.now()}`,
         starId: `KIC-${Math.floor(Math.random() * 9_000_000)}`,
         filename: data?.meta?.filename || "uploaded.csv",
@@ -130,6 +132,38 @@ export default function PredictionCard({ data, onAddToCatalog, onResult }) {
                   : "–"}
               </span>
             </div>
+            <div className="mt-6 grid md:grid-cols-2 gap-4 text-sm">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <h4 className="text-white/80 font-semibold text-xs uppercase tracking-wider">
+                  Transit Power (Top 3)
+                </h4>
+                <ul className="mt-2 space-y-1 text-white/80">
+                  {result?.vetting?.power?.length
+                    ? result.vetting.power.slice(0, 3).map((pow, idx) => (
+                        <li key={idx} className="flex justify-between font-mono">
+                          <span>P{idx + 1}</span>
+                          <span>{pow?.toFixed ? pow.toFixed(2) : Number(pow).toFixed(2)}</span>
+                        </li>
+                      ))
+                    : (
+                        <li className="text-white/50 font-mono">No peaks</li>
+                      )}
+                </ul>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-white/70">
+                  <StatMini label="CDPP (ppm)" value={result?.vetting?.cdpp_ppm} />
+                  <StatMini label="Flicker (ppm)" value={result?.vetting?.flicker_ppm} />
+                  <StatMini label="Noise ρ" value={result?.vetting?.noise_autocorr} fmt={(v) => v.toFixed(3)} />
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <h4 className="text-white/80 font-semibold text-xs uppercase tracking-wider">
+                  BLS Periodogram
+                </h4>
+                <div className="mt-2 h-32">
+                  <PeriodogramPlot data={result?.periodogram} />
+                </div>
+              </div>
+            </div>
             <div className="mt-6">
               <button
                 disabled={!canRun || running}
@@ -195,5 +229,72 @@ function Stat({ label, value, fmt }) {
       <div className="text-white/60 text-xs">{label}</div>
       <div className="text-white font-medium">{v}</div>
     </div>
+  );
+}
+
+function StatMini({ label, value, fmt }) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    return (
+      <div className="rounded-lg border border-white/5 bg-white/10 px-2 py-1 text-center">
+        <div className="text-white/40 text-[10px] uppercase">{label}</div>
+        <div className="text-white/60 text-xs">–</div>
+      </div>
+    );
+  }
+  const formatted = fmt ? fmt(num) : num.toFixed(1);
+  return (
+    <div className="rounded-lg border border-white/5 bg-white/10 px-2 py-1 text-center">
+      <div className="text-white/40 text-[10px] uppercase">{label}</div>
+      <div className="text-white text-xs font-semibold">{formatted}</div>
+    </div>
+  );
+}
+
+function PeriodogramPlot({ data }) {
+  const points = Array.isArray(data) ? data : [];
+  if (!points.length) {
+    return (
+      <div className="h-full flex items-center justify-center text-white/40 text-xs">
+        No periodogram
+      </div>
+    );
+  }
+  const periods = points.map((d) => Number(d[0]));
+  const powers = points.map((d) => Number(d[1]));
+  const minP = Math.min(...periods);
+  const maxP = Math.max(...periods);
+  const minPow = Math.min(...powers);
+  const maxPow = Math.max(...powers);
+  const scaleX = (p) => ((p - minP) / (maxP - minP || 1)) * 100;
+  const scaleY = (pow) => 100 - ((pow - minPow) / (maxPow - minPow || 1)) * 100;
+  const coords = points.map(
+    (pt) => `${scaleX(Number(pt[0])).toFixed(2)},${scaleY(Number(pt[1])).toFixed(2)}`
+  );
+  const path = coords.map((coord, idx) => `${idx ? "L" : "M"}${coord}`).join(" ");
+  return (
+    <svg viewBox="0 0 100 100" className="h-full w-full" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="blsGradient" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="rgba(168,85,247,0.7)" />
+          <stop offset="100%" stopColor="rgba(59,130,246,0.2)" />
+        </linearGradient>
+      </defs>
+      <path d={path} fill="none" stroke="url(#blsGradient)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+      <polyline
+        points={coords.join(" ")}
+        fill="none"
+        stroke="rgba(168,85,247,0.2)"
+        strokeWidth="5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        opacity="0.25"
+      />
+      <g stroke="rgba(255,255,255,0.1)" strokeWidth="0.2">
+        {[0, 25, 50, 75, 100].map((y) => (
+          <line key={y} x1="0" x2="100" y1={y} y2={y} />
+        ))}
+      </g>
+    </svg>
   );
 }
