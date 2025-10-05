@@ -20,8 +20,8 @@ from itertools import zip_longest
 from astropy.timeseries import BoxLeastSquares
 
 # --------- CONFIG ---------
-POS_N = int(os.getenv("EV_POS_N", "500"))
-NEG_N = int(os.getenv("EV_NEG_N", "500"))
+POS_N = int(os.getenv("EV_POS_N", "1000"))
+NEG_N = int(os.getenv("EV_NEG_N", "1000"))
 CHECKPOINT_EVERY = int(os.getenv("EV_CKPT_EVERY", "50"))
 SLEEP_SEC = float(os.getenv("EV_SLEEP_SEC", "0.02"))
 
@@ -142,6 +142,35 @@ def fetch_nonplanets(n: int, exclude: Optional[Iterable[int]] = None) -> List[in
             df = df[~df["kepid"].isin(exclude_set)]
     shuffled = _deterministic_shuffle(df, seed=123)
     return shuffled.head(min(n, len(shuffled)))["kepid"].tolist()
+
+
+def fetch_stellar_params(kepids: List[int]) -> Dict[int, Dict[str, float]]:
+    """Fetch stellar parameters for the provided KEPIDs."""
+    if not kepids:
+        return {}
+
+    NasaExoplanetArchive.ROW_LIMIT = -1
+    params: Dict[int, Dict[str, float]] = {}
+    unique_ids = sorted(set(int(k) for k in kepids))
+    chunk_size = 300
+    for i in range(0, len(unique_ids), chunk_size):
+        chunk = unique_ids[i : i + chunk_size]
+        where = "kepid in (" + ",".join(str(int(k)) for k in chunk) + ")"
+        tbl = NasaExoplanetArchive.query_criteria(
+            table="q1_q17_dr25_sup_koi",
+            select="kepid,koi_steff,koi_slogg,koi_srad",
+            where=where,
+        )
+        if tbl is None:
+            continue
+        df = tbl.to_pandas()
+        for row in df.itertuples():
+            params[int(row.kepid)] = {
+                "stellar_teff": float(getattr(row, "koi_steff", np.nan)),
+                "stellar_logg": float(getattr(row, "koi_slogg", np.nan)),
+                "stellar_radius": float(getattr(row, "koi_srad", np.nan)),
+            }
+    return params
 
 
 def fetch_stellar_params(kepids: List[int]) -> Dict[int, Dict[str, float]]:
@@ -429,6 +458,179 @@ def load_processed_kepids(csv_path: Path) -> set[int]:
         return set(df["kepid"].astype(int).tolist())
     except Exception:
         return set()
+
+def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int:
+    """Ensure cached negatives align with the currently fetched set."""
+    if not csv_path.exists():
+        return 0
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return 0
+
+    if df.empty or "kepid" not in df or "label" not in df:
+        return 0
+
+    neg_mask = df["label"] == 0
+    keep_mask = ~neg_mask | df["kepid"].isin(list(allowed_negatives))
+    removed = int((~keep_mask).sum())
+    if removed > 0:
+        df.loc[keep_mask].to_csv(csv_path, index=False)
+    return removed
+
+def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int:
+    """Ensure cached negatives align with the currently fetched set."""
+    if not csv_path.exists():
+        return 0
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return 0
+
+    if df.empty or "kepid" not in df or "label" not in df:
+        return 0
+
+    neg_mask = df["label"] == 0
+    keep_mask = ~neg_mask | df["kepid"].isin(list(allowed_negatives))
+    removed = int((~keep_mask).sum())
+    if removed > 0:
+        cleaned = _ensure_schema(df.loc[keep_mask])
+        cleaned.to_csv(csv_path, index=False)
+    return removed
+
+
+def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int:
+    """Ensure cached negatives align with the currently fetched set."""
+    if not csv_path.exists():
+        return 0
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return 0
+
+    if df.empty or "kepid" not in df or "label" not in df:
+        return 0
+
+    neg_mask = df["label"] == 0
+    keep_mask = ~neg_mask | df["kepid"].isin(list(allowed_negatives))
+    removed = int((~keep_mask).sum())
+    if removed > 0:
+        cleaned = _ensure_schema(df.loc[keep_mask])
+        cleaned.to_csv(csv_path, index=False)
+    return removed
+
+
+def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int:
+    """Ensure cached negatives align with the currently fetched set."""
+    if not csv_path.exists():
+        return 0
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return 0
+
+    if df.empty or "kepid" not in df or "label" not in df:
+        return 0
+
+    neg_mask = df["label"] == 0
+    keep_mask = ~neg_mask | df["kepid"].isin(list(allowed_negatives))
+    removed = int((~keep_mask).sum())
+    if removed > 0:
+        cleaned = _ensure_schema(df.loc[keep_mask])
+        cleaned.to_csv(csv_path, index=False)
+    return removed
+
+
+def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int:
+    """Ensure cached negatives align with the currently fetched set."""
+    if not csv_path.exists():
+        return 0
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return 0
+
+    if df.empty or "kepid" not in df or "label" not in df:
+        return 0
+
+    neg_mask = df["label"] == 0
+    keep_mask = ~neg_mask | df["kepid"].isin(list(allowed_negatives))
+    removed = int((~keep_mask).sum())
+    if removed > 0:
+        cleaned = _ensure_schema(df.loc[keep_mask])
+        cleaned.to_csv(csv_path, index=False)
+    return removed
+
+
+def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int:
+    """Ensure cached negatives align with the currently fetched set."""
+    if not csv_path.exists():
+        return 0
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return 0
+
+    if df.empty or "kepid" not in df or "label" not in df:
+        return 0
+
+    neg_mask = df["label"] == 0
+    keep_mask = ~neg_mask | df["kepid"].isin(list(allowed_negatives))
+    removed = int((~keep_mask).sum())
+    if removed > 0:
+        cleaned = _ensure_schema(df.loc[keep_mask])
+        cleaned.to_csv(csv_path, index=False)
+    return removed
+
+
+def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int:
+    """Ensure cached negatives align with the currently fetched set."""
+    if not csv_path.exists():
+        return 0
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return 0
+
+    if df.empty or "kepid" not in df or "label" not in df:
+        return 0
+
+    neg_mask = df["label"] == 0
+    keep_mask = ~neg_mask | df["kepid"].isin(list(allowed_negatives))
+    removed = int((~keep_mask).sum())
+    if removed > 0:
+        cleaned = _ensure_schema(df.loc[keep_mask])
+        cleaned.to_csv(csv_path, index=False)
+    return removed
+
+
+def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int:
+    """Ensure cached negatives align with the currently fetched set."""
+    if not csv_path.exists():
+        return 0
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return 0
+
+    if df.empty or "kepid" not in df or "label" not in df:
+        return 0
+
+    neg_mask = df["label"] == 0
+    keep_mask = ~neg_mask | df["kepid"].isin(list(allowed_negatives))
+    removed = int((~keep_mask).sum())
+    if removed > 0:
+        cleaned = _ensure_schema(df.loc[keep_mask])
+        cleaned.to_csv(csv_path, index=False)
+    return removed
 
 
 def refresh_cached_negatives(csv_path: Path, allowed_negatives: set[int]) -> int:
