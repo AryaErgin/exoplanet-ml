@@ -20,8 +20,8 @@ from itertools import zip_longest
 from astropy.timeseries import BoxLeastSquares
 
 # --------- CONFIG ---------
-POS_N = int(os.getenv("EV_POS_N", "500"))
-NEG_N = int(os.getenv("EV_NEG_N", "500"))
+POS_N = int(os.getenv("EV_POS_N", "1000"))
+NEG_N = int(os.getenv("EV_NEG_N", "1000"))
 CHECKPOINT_EVERY = int(os.getenv("EV_CKPT_EVERY", "50"))
 SLEEP_SEC = float(os.getenv("EV_SLEEP_SEC", "0.02"))
 

@@ -7,6 +7,7 @@ model, validating it, and deploying the stack for demonstrations or judging.
 
 ```bash
 # activate your virtualenv first
+pip install -r backend/requirements.txt
 python research/scripts/bootstrap_training_environment.py --out research/work/bootstrap --count 75
 ```
 
