@@ -7,6 +7,7 @@ import UploadPanel from "./components/UploadPanel.jsx";
 import VisualizationPanel from "./components/VisualizationPanel.jsx";
 import PredictionCard from "./components/PredictionCard.jsx";
 import CatalogTable from "./components/CatalogTable.jsx";
+import EvaluationPanel from "./components/EvaluationPanel.jsx";
 import About from "./components/About.jsx";
 import Footer from "./components/Footer.jsx";
 import HarnessTestSuite from "./components/HarnessTestSuite.jsx";
@@ -69,6 +70,7 @@ export default function App() {
           onAddToCatalog={refreshRuns}
           onResult={setLastResult}
         />
+        <EvaluationPanel />
         <CatalogTable items={catalog} />
         <About />
         <Footer />
