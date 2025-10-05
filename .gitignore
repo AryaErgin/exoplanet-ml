@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environments
+.venv/
+.mlenv/
+
+# Data & models
+research/work/bootstrap/
+research/data/
+backend/app/models/current/
+*.joblib
+*.csv
+*.log
+
+# IDE
+.vscode/
+.idea/

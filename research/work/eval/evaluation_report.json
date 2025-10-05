@@ -1,0 +1,163 @@
+{
+  "models": {
+    "hist_gradient_boosting": {
+      "auc": 0.697217430435761,
+      "precision": 0.6172248803827751,
+      "recall": 0.6417910447761194,
+      "f1": 0.6292682926829268,
+      "accuracy": 0.62,
+      "confusion_matrix": [
+        [
+          119,
+          80
+        ],
+        [
+          72,
+          129
+        ]
+      ],
+      "classification_report": {
+        "0": {
+          "precision": 0.6230366492146597,
+          "recall": 0.5979899497487438,
+          "f1-score": 0.6102564102564103,
+          "support": 199.0
+        },
+        "1": {
+          "precision": 0.6172248803827751,
+          "recall": 0.6417910447761194,
+          "f1-score": 0.6292682926829268,
+          "support": 201.0
+        },
+        "accuracy": 0.62,
+        "macro avg": {
+          "precision": 0.6201307647987174,
+          "recall": 0.6198904972624315,
+          "f1-score": 0.6197623514696686,
+          "support": 400.0
+        },
+        "weighted avg": {
+          "precision": 0.6201162353766377,
+          "recall": 0.62,
+          "f1-score": 0.6198098811757349,
+          "support": 400.0
+        }
+      },
+      "cv_auc_mean": 0.7170892552391817,
+      "cv_auc_std": 0.008431759715533135
+    },
+    "random_forest": {
+      "auc": 0.7254681367034176,
+      "precision": 0.6475409836065574,
+      "recall": 0.7860696517412935,
+      "f1": 0.7101123595505618,
+      "accuracy": 0.6775,
+      "confusion_matrix": [
+        [
+          113,
+          86
+        ],
+        [
+          43,
+          158
+        ]
+      ],
+      "classification_report": {
+        "0": {
+          "precision": 0.7243589743589743,
+          "recall": 0.5678391959798995,
+          "f1-score": 0.6366197183098592,
+          "support": 199.0
+        },
+        "1": {
+          "precision": 0.6475409836065574,
+          "recall": 0.7860696517412935,
+          "f1-score": 0.7101123595505618,
+          "support": 201.0
+        },
+        "accuracy": 0.6775,
+        "macro avg": {
+          "precision": 0.6859499789827659,
+          "recall": 0.6769544238605965,
+          "f1-score": 0.6733660389302105,
+          "support": 400.0
+        },
+        "weighted avg": {
+          "precision": 0.6857579340058848,
+          "recall": 0.6775,
+          "f1-score": 0.6735497705333122,
+          "support": 400.0
+        }
+      },
+      "cv_auc_mean": 0.7401557604946725,
+      "cv_auc_std": 0.005678631319696432
+    },
+    "logistic_regression": {
+      "auc": 0.688467211680292,
+      "precision": 0.6322314049586777,
+      "recall": 0.7611940298507462,
+      "f1": 0.690744920993228,
+      "accuracy": 0.6575,
+      "confusion_matrix": [
+        [
+          110,
+          89
+        ],
+        [
+          48,
+          153
+        ]
+      ],
+      "classification_report": {
+        "0": {
+          "precision": 0.6962025316455697,
+          "recall": 0.5527638190954773,
+          "f1-score": 0.6162464985994398,
+          "support": 199.0
+        },
+        "1": {
+          "precision": 0.6322314049586777,
+          "recall": 0.7611940298507462,
+          "f1-score": 0.690744920993228,
+          "support": 201.0
+        },
+        "accuracy": 0.6575,
+        "macro avg": {
+          "precision": 0.6642169683021237,
+          "recall": 0.6569789244731118,
+          "f1-score": 0.6534957097963339,
+          "support": 400.0
+        },
+        "weighted avg": {
+          "precision": 0.6640570404854064,
+          "recall": 0.6575,
+          "f1-score": 0.6536819558523184,
+          "support": 400.0
+        }
+      },
+      "cv_auc_mean": 0.6970882039077679,
+      "cv_auc_std": 0.018818497421471077
+    }
+  },
+  "features": [
+    "median",
+    "std",
+    "mad",
+    "min_depth_ppm",
+    "snr",
+    "cdpp_ppm",
+    "flicker_ppm",
+    "noise_autocorr",
+    "bls_period",
+    "bls_power",
+    "bls_depth_ppm",
+    "bls_duration_hr",
+    "bls_snr",
+    "stellar_teff",
+    "stellar_logg",
+    "stellar_radius",
+    "log_depth",
+    "log_snr",
+    "log_n"
+  ]
+}
