@@ -104,7 +104,8 @@ def fetch_koi(n: int) -> List[int]:
     df = tbl.to_pandas().dropna(subset=["kepid"]).drop_duplicates("kepid")
     if df.empty:
         return []
-    return df.sample(min(n, len(df)), random_state=42)["kepid"].astype(int).tolist()
+    shuffled = df.sample(frac=1.0, random_state=42).reset_index(drop=True)
+    return shuffled.head(min(n, len(shuffled)))["kepid"].astype(int).tolist()
 
 
 def fetch_nonplanets(n: int) -> List[int]:
